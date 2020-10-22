@@ -11,8 +11,9 @@
 #import <React/RCTBridge.h>
 
 static bool waiting = true;
-static bool addedJsLoadErrorObserver = false;
 static UIView* loadingView = nil;
+static UIView* parentView = nil;
+static NSString* splash = nil;
 
 @implementation RNSplashScreen
 - (dispatch_queue_t)methodQueue{
@@ -21,18 +22,25 @@ static UIView* loadingView = nil;
 RCT_EXPORT_MODULE(SplashScreen)
 
 + (void)show {
-    if (!addedJsLoadErrorObserver) {
-        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(jsLoadError:) name:RCTJavaScriptDidFailToLoadNotification object:nil];
-        addedJsLoadErrorObserver = true;
+    if (!loadingView) {
+        loadingView = [[[NSBundle mainBundle] loadNibNamed:splash owner:self options:nil] objectAtIndex:0];
+        CGRect frame = parentView.frame;
+        frame.origin = CGPointMake(0, 0);
+        loadingView.frame = frame;
     }
+    waiting = false;
+    
+    [loadingView setAlpha:0.0];
+    [parentView addSubview:loadingView];
 
-    while (waiting) {
-        NSDate* later = [NSDate dateWithTimeIntervalSinceNow:0.1];
-        [[NSRunLoop mainRunLoop] runUntilDate:later];
-    }
+    [UIView animateWithDuration:0.3 animations:^{
+        [loadingView setAlpha:1.0];
+    }];
 }
 
 + (void)showSplash:(NSString*)splashScreen inRootView:(UIView*)rootView {
+    parentView = rootView;
+    splash = splashScreen;
     if (!loadingView) {
         loadingView = [[[NSBundle mainBundle] loadNibNamed:splashScreen owner:self options:nil] objectAtIndex:0];
         CGRect frame = rootView.frame;
@@ -50,8 +58,13 @@ RCT_EXPORT_MODULE(SplashScreen)
             waiting = false;
         });
     } else {
+        [loadingView setAlpha:1.0];
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            [loadingView removeFromSuperview];
+            [UIView animateWithDuration:0.3 animations:^{
+                [loadingView setAlpha:0.0];
+            } completion:^(BOOL finished) {
+                [loadingView removeFromSuperview];
+            }];
         });
     }
 }
